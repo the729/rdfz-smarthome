@@ -19,12 +19,12 @@ void bool_changed(char index, boolean new_state)
         else
             digitalWrite(13, LOW);
     }
-    /*if (index == 1) {
+    if (index == 1) {
         if (new_state)
             digitalWrite(12, HIGH);
         else
             digitalWrite(12, LOW);
-    }*/
+    }
 }
 
 void data_changed(int new_data)

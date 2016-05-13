@@ -2,43 +2,37 @@ void setup() {
     Serial.begin(9600);
     
     pinMode(13, OUTPUT);
-    pinMode(10, INPUT);
+    pinMode(12, OUTPUT);
+    pinMode(11, OUTPUT);
 }
 
 void loop() {
-    static char state = 0;
     pollModule();
-
-    // Check new state by reading P10, then compare it with the previous state. 
-    // If the state changed, call set_data to update onto the cloud server.
-    // The value will be either 0 or 100 depending on P10. 
-    // P13 (i.e. L on the board) indicates state changes.
-    if (digitalRead(10)) {
-       if (state == 0) {
-            state = 1;
-            digitalWrite(13, HIGH);
-            set_data(100);
-        }
-    } else {
-        if (state == 1) {
-            state = 0;
-            digitalWrite(13, LOW);
-            set_data(0);
-        }
-    }
-    
 }
 
 void bool_changed(char index, boolean new_state)
 {
-    // Nothing to do.
-    // But you must keep this function to compile the code.
+    //
+    if (index == 0) {
+        if (new_state)
+            digitalWrite(13, HIGH);
+        else
+            digitalWrite(13, LOW);
+    }
+    if (index == 1) {
+        if (new_state)
+            digitalWrite(12, HIGH);
+        else
+            digitalWrite(12, LOW);
+    }
 }
 
 void data_changed(int new_data)
 {
-    // Nothing
-    // But you must keep this function to compile the code.
+    //
+    new_data = constrain(new_data, 0, 100);
+    new_data = new_data * 255 / 100;
+    analogWrite(11, new_data);
 }
 
 
@@ -74,7 +68,7 @@ void data_changed(int new_data)
 uint8_t cmd_buf[MOD_PKT_MAX_LEN];
 char mode_state;
 boolean bool_state[4];
-uint16_t data_state;
+uint16_t data_state[2];
 
 void pollModule()
 {
@@ -96,10 +90,10 @@ void pollModule()
         report_mode_bool();
         bool_changed((cmd_buf[0] & 0x06)>>1, (cmd_buf[0] & 0x01));
     }
-    if (cmd_buf[0] == 0xA2 && cmd_buf[1] == 0) {
-        data_state = ((uint16_t)(cmd_buf[2]) << 8) + cmd_buf[3];
-        report_data_0();
-        data_changed((int)data_state);
+    if (cmd_buf[0] == 0xA2 && cmd_buf[1] == 1) {
+        data_state[1] = ((uint16_t)(cmd_buf[2]) << 8) + cmd_buf[3];
+        report_data(1);
+        data_changed((int)(data_state[1]));
     }
 }
 
@@ -112,20 +106,20 @@ void set_bool(char index, boolean new_state)
 
 void set_data(int new_data)
 {
-    data_state = (uint16_t)new_data;
-    report_data_0();
+    data_state[0] = (uint16_t)new_data;
+    report_data(0);
 }
 
 void set_data(char new_data)
 {
-    data_state = (uint16_t)(short)new_data;
-    report_data_0();
+    data_state[0] = (uint16_t)(short)new_data;
+    report_data(0);
 }
 
 void set_data(short new_data)
 {
-    data_state = (uint16_t)new_data;
-    report_data_0();
+    data_state[0] = (uint16_t)new_data;
+    report_data(0);
 }
 
 void report_mode_bool()
@@ -136,13 +130,16 @@ void report_mode_bool()
     mod_send_cmd((char *)cmd_send, 2);
 }
 
-void report_data_0()
+void report_data(char idx)
 {
     uint8_t cmd_send[4];
+    
+    if (idx != 0 && idx != 1) return;
+    
     cmd_send[0] = 0xB2;
-    cmd_send[1] = 0;
-    cmd_send[2] = (data_state>>8);
-    cmd_send[3] = (data_state & 0xFF);
+    cmd_send[1] = idx;
+    cmd_send[2] = (data_state[idx]>>8);
+    cmd_send[3] = (data_state[idx] & 0xFF);
     mod_send_cmd((char *)cmd_send, 4);
 }
 
